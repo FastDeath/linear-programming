@@ -43,18 +43,24 @@ subject to forbid_unknowns{l in Lap, c in Course}:
 subject to every_lap_by_another{c in Course, p in Player}:
 	sum {l in Lap} swims[l, c, p] <= 1;
 
-subject to player_is_chill{l in Lap, c in Course, p in Player}:
-    sum { ls in Lap, cs in Course: 
-            # swims[ls, cs, p] = 1 # only the ones swum by p
+# subject to player_is_chill{l in Lap, c in Course, p in Player}:
+#     sum { ls in Lap, cs in Course :
+#             # only the ones before l/c
+#             (ls < l or (ls = l and cs < c))
             
-            # only the ones before c
-            # and 
-            (ls < l or (ls = l and cs < c))
-            
-            # only the ones that still affect (prevent negative rating)
-            and CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) >= c + (l-1)*NumCourses - 1 
-        } (swims[ls, cs, p] * (CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) + 1 - c - (l-1)*NumCourses)) / MaxOverload + swims[l, c, p] <= 1;
+#             # only the ones that still affect (prevent negative rating)
+#             # (CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) + 1 - c - (l-1)*NumCourses)) >= 0
+#             and CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) >= c + (l-1)*NumCourses - 1 
+#         } ((1 - swims[ls, cs, p] - swims[l,c,p]) * CourseDifficulty[cs] + 1 - c - (l-1)*NumCourses) = 0;
+        # remaining difficulty rating shall be less than MaxOverload
+        # <= MaxOverload;
 # min {l in Lap, c in Course : swims[l, c, p] = 1}
+
+subject to player_is_chill{l in Lap, c in Course, p in Player}:
+    sum { ls in Lap, cs in Course : 
+        # after swimming ls/cs, p can't swim for CourseDifficulty[cs] - MaxOverload courses
+        (l-1)*NumCourses+c - ((ls-1)*NumCourses+cs) in {1..(CourseDifficulty[cs]-MaxOverload)}
+    } swims[ls,cs,p] + swims[l,c,p] <= 1;
 
 solve;
 
@@ -131,41 +137,40 @@ printf "\n";
 
 # difficulty
 
-for {p in Player, l in Lap, c in Course} {
-    # printf "  P%i %s L%i/C%i %s: %s\n", p, PlayerName[p], l, c, CourseName[c], 
-    #     sum{ls in Lap, cs in Course : ls < l or cs < c } if swims[ls, cs, p] = 1 then CourseDifficulty[cs] else 0;
+for {p in Player}
+{
+    printf "P%i %s:\n", p, PlayerName[p];
+    for {l in Lap, c in Course} {
+        # check if p swims l/c
+        printf if swims[l, c, p] = 1 then "> +%-2i " else "      ", CourseDifficulty[c];
+            
+        printf "L%i/C%-2i #%-2i %8s: %3s %s\n", l, c, (l-1)*NumCourses+c, CourseName[c], 
+                if Score[c,p] > 0 then Score[c,p] else "",
+                if
+                    sum { ls in Lap, cs in Course : 
+                        # after swimming ls/cs, p can't swim for CourseDifficulty[cs] - MaxOverload courses
+                        (l-1)*NumCourses+c - ((ls-1)*NumCourses+cs) in {1..(CourseDifficulty[cs]-MaxOverload)}
+                    } swims[ls,cs,p]
+                > 0 then "*cooldown*" else "";
 
-    # printf "  P%i %s L%i/C%i %s: %s\n", p, PlayerName[p], l, c, CourseName[c], 
-    #     sum { ls in Lap, cs in Course 
-    #         : swims[ls, cs, p] = 1 # only the ones swum by p
-            
-    #         # only the ones before c
-    #         and (ls < l or (ls = l and cs < c))
-            
-    #         # only the ones that still affect (prevent negative rating)
-    #         and CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) >= c + (l-1)*NumCourses - 1 
-    #     } (CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) + 1 - c - (l-1)*NumCourses);
+        # for {ls in Lap, cs in Course}
+        # {
+        #     printf "        L%i/C%i #%i -> swims=%i\n", ls, cs, ((ls-1)*NumCourses+cs) - ((l-1)*NumCourses+c), swims[ls,cs,p];
+        # }
 
-    printf "  P%i %s L%i/C%i %s: %s\n", p, PlayerName[p], l, c, CourseName[c], 
-        sum { ls in Lap, cs in Course: 
-            # swims[ls, cs, p] = 1 # only the ones swum by p
-            
-            # only the ones before c
-            # and 
-            (ls < l or (ls = l and cs < c))
-            
-            # only the ones that still affect (prevent negative rating)
-            and CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) >= c + (l-1)*NumCourses - 1 
-        } (swims[ls, cs, p] * (CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) + 1 - c - (l-1)*NumCourses));
-        
+            # sum { ls in Lap, cs in Course : 
+            #     # (ls = l and cs = c-1) or (ls = l-1 and cs = NumCourses)
 
-    printf if swims[l, c, p] = 1 then "> P%i %s swims L%i/C%i %s -> +%i difficulty\n" else "", p, PlayerName[p], l, c, CourseName[c], CourseDifficulty[c];
+            #     (l-1)*NumCourses+c - (ls-1)*NumCourses+cs = 1
+            # } (swims[ls,cs,p] * (ls-1)*NumCourses+cs);
+
+    }  
 }
 
 data; # problem data
 
 param MaxCoursesPerPlayer := 5;
-param MaxOverload := 15;
+param MaxOverload := -1;
 
 param NumLaps := 2;
 param NumCourses := 13;

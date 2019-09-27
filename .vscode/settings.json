@@ -1,0 +1,17 @@
+{
+	"contributes": {
+		"languages": [
+			{
+				"id": "gmpl",
+				"extensions": [".mod"]
+			}
+		],
+		"grammars": [
+			{
+				"language": "gmpl",
+				"scopeName": "source.gmpl",
+				"path": "./gmpl.tmGrammar.json"
+			}
+		]
+	}
+}

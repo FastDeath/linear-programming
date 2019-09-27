@@ -1,0 +1,362 @@
+param NumLaps;
+param NumCourses;
+param NumPlayers;
+
+set Lap := 1..NumLaps;
+set Course := 1..NumCourses;
+set Player := 1..NumPlayers;
+
+param Score{1..NumCourses, 1..NumPlayers};
+param CourseName{Course} symbolic;
+param PlayerName{Player} symbolic;
+param CourseDifficulty{Course};
+# display CourseName, CourseDifficulty;
+
+param MaxCoursesPerPlayer;
+param MaxOverload;
+
+param BestTime{c in Course} := min{p in Player : Score[c, p] <> 0} Score[c, p];
+
+# Decision variables
+var swims{Lap,Course,Player}, binary;
+
+# Objective
+# minimize z:
+maximize z:
+	sum {l in Lap, c in Course, p in Player} Score[c, p] * swims[l, c, p];
+    
+# Constraints
+
+# Every player may not swim more than a total of MaxCoursesPerPlayer times
+subject to max_courses{p in Player}:
+	sum {l in Lap, c in Course} swims[l, c, p] <= MaxCoursesPerPlayer;
+	
+# Every course has to be swum exactly once every lap
+subject to every_course{l in Lap, c in Course}:
+	sum {p in Player} swims[l, c, p] = 1;
+
+# A player cant swim a course if the recorded time is 0 (unknown)
+subject to forbid_unknowns{l in Lap, c in Course}:
+	sum {p in Player: Score[c, p] = 0} swims[l, c, p] = 0;
+	
+# Players cant swim the same course more than once (in different laps)
+subject to every_lap_by_another{c in Course, p in Player}:
+	sum {l in Lap} swims[l, c, p] <= 1;
+
+subject to player_is_chill{l in Lap, c in Course, p in Player}:
+    sum { ls in Lap, cs in Course: 
+            # swims[ls, cs, p] = 1 # only the ones swum by p
+            
+            # only the ones before c
+            # and 
+            (ls < l or (ls = l and cs < c))
+            
+            # only the ones that still affect (prevent negative rating)
+            and CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) >= c + (l-1)*NumCourses - 1 
+        } (swims[ls, cs, p] * (CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) + 1 - c - (l-1)*NumCourses)) / MaxOverload + swims[l, c, p] <= 1;
+# min {l in Lap, c in Course : swims[l, c, p] = 1}
+
+solve;
+
+# output solution
+
+printf "\n%5s ", 'P\L.C';
+for {l in Lap, c in Course}
+{
+    printf if c = 1 then "║ " else "│ ";
+    printf "%2i.%-3i", l, c;
+}
+printf "║ %s", "Sum";
+printf "\n";
+
+printf "%-6s", '------';
+for {l in Lap, c in Course}
+    printf "+-%-6s", '------';
+printf "%-5s", '+----';
+printf "\n";
+
+for {p in Player}
+{
+    printf "P%-4i ", p;
+    # printf "%-4s", PlayerName[p];
+    for {l in Lap, c in Course}
+    {
+        printf if c = 1 then "║ " else "│ ";
+        printf if swims[l,c,p] then "[%-3i]" else " %-3i ", Score[c,p];
+        printf "%s", if BestTime[c] = Score[c,p] then "*" else " ";
+    }
+    printf "║ %3i",
+        sum {l in Lap, c in Course} swims[l,c,p] * Score[c,p];
+        
+    printf "\n";
+}
+
+printf "%-6s", '======';
+for {l in Lap, c in Course}
+    printf "==%-6s", '======';
+printf "%-5s", '=====';
+printf "\n";
+
+printf "%5s ", "Sum";
+for {l in Lap, c in Course}
+{
+    printf if c = 1 then "║ " else "│ ";
+    printf "%4i  ", sum {p in Player} swims[l,c,p] * Score[c,p];
+}
+
+printf "║ %3i", z;
+printf "\n";
+        
+printf " \nLegend:\n";
+printf "[#] selected time\n";
+printf "  * best time per course\n";
+
+printf "\n";
+
+printf '"Strecke"';
+for {p in Player}
+    printf ',"%s"', PlayerName[p];
+printf "\n";
+
+for {l in Lap, c in Course} {
+    printf '"%i/%s",', l, CourseName[c];
+
+    for {p in Player} {
+        printf '%s,', if swims[l,c,p] = 0 then "" else swims[l,c,p] * Score[c,p];
+    }
+
+    printf "\n";
+}
+printf "\n";
+
+# difficulty
+
+for {p in Player, l in Lap, c in Course} {
+    # printf "  P%i %s L%i/C%i %s: %s\n", p, PlayerName[p], l, c, CourseName[c], 
+    #     sum{ls in Lap, cs in Course : ls < l or cs < c } if swims[ls, cs, p] = 1 then CourseDifficulty[cs] else 0;
+
+    # printf "  P%i %s L%i/C%i %s: %s\n", p, PlayerName[p], l, c, CourseName[c], 
+    #     sum { ls in Lap, cs in Course 
+    #         : swims[ls, cs, p] = 1 # only the ones swum by p
+            
+    #         # only the ones before c
+    #         and (ls < l or (ls = l and cs < c))
+            
+    #         # only the ones that still affect (prevent negative rating)
+    #         and CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) >= c + (l-1)*NumCourses - 1 
+    #     } (CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) + 1 - c - (l-1)*NumCourses);
+
+    printf "  P%i %s L%i/C%i %s: %s\n", p, PlayerName[p], l, c, CourseName[c], 
+        sum { ls in Lap, cs in Course: 
+            # swims[ls, cs, p] = 1 # only the ones swum by p
+            
+            # only the ones before c
+            # and 
+            (ls < l or (ls = l and cs < c))
+            
+            # only the ones that still affect (prevent negative rating)
+            and CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) >= c + (l-1)*NumCourses - 1 
+        } (swims[ls, cs, p] * (CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) + 1 - c - (l-1)*NumCourses));
+        
+
+    printf if swims[l, c, p] = 1 then "> P%i %s swims L%i/C%i %s -> +%i difficulty\n" else "", p, PlayerName[p], l, c, CourseName[c], CourseDifficulty[c];
+}
+
+data; # problem data
+
+param MaxCoursesPerPlayer := 5;
+param MaxOverload := 15;
+
+param NumLaps := 2;
+param NumCourses := 13;
+param NumPlayers := 10;
+
+param : CourseName, CourseDifficulty :=
+    1, "200F", 2
+    2, "100B", 1
+    3, "200R", 2
+    4, "100S", 1
+    5, "1500F", 15
+    6, "200L", 2
+    7, "50F", 1
+    8, "200S", 2
+    9, "400F", 4
+    10, "200B", 2
+    11, "100R", 1
+    12, "400L", 4
+    13, "100F", 1
+;
+
+param PlayerName :=
+    1, "Paul"
+    2, "Alex R"
+    3, "Basti"
+    4, "Simon U"
+    5, "Marc"
+    6, "Matze"
+    7, "Simon"
+    8, "Luis"
+    9, "Oli"
+    10, "Moritz"
+;
+
+param Score := 
+#   c, p, time
+    # 1, 1, 15
+    # 1, 2, 20
+    # 1, 3, 12
+    # 1, 4, 10
+    # 1, 5, 12
+    
+    # 2, 1, 25
+    # 2, 2, 25
+    # 2, 3, 20
+    # 2, 4, 30
+    # 2, 5, 22
+
+    # 3, 1, 35
+    # 3, 2, 27
+    # 3, 3, 30
+    # 3, 4, 32
+    # 3, 5, 30
+
+    # 4, 1, 36
+    # 4, 2, 38
+    # 4, 3, 40
+    # 4, 4, 35
+    # 4, 5, 38
+#c	p	time
+1	1	0
+2	1	0
+3	1	0
+4	1	552
+5	1	0
+6	1	0
+7	1	545
+8	1	544
+9	1	0
+10	1	0
+11	1	0
+12	1	0
+13	1	568
+1	2	0
+2	2	0
+3	2	0
+4	2	0
+5	2	0
+6	2	0
+7	2	565
+8	2	0
+9	2	0
+10	2	0
+11	2	0
+12	2	0
+13	2	0
+1	3	0
+2	3	598
+3	3	0
+4	3	0
+5	3	0
+6	3	0
+7	3	565
+8	3	0
+9	3	0
+10	3	573
+11	3	0
+12	3	0
+13	3	0
+1	4	0
+2	4	525
+3	4	0
+4	4	0
+5	4	542
+6	4	494
+7	4	0
+8	4	0
+9	4	497
+10	4	564
+11	4	0
+12	4	536
+13	4	0
+1	5	630
+2	5	626
+3	5	0
+4	5	0
+5	5	0
+6	5	573
+7	5	0
+8	5	0
+9	5	0
+10	5	637
+11	5	0
+12	5	664
+13	5	568
+1	6	0
+2	6	0
+3	6	0
+4	6	0
+5	6	505
+6	6	0
+7	6	0
+8	6	0
+9	6	453
+10	6	0
+11	6	0
+12	6	0
+13	6	0
+1	7	0
+2	7	0
+3	7	0
+4	7	0
+5	7	0
+6	7	600
+7	7	559
+8	7	0
+9	7	0
+10	7	0
+11	7	513
+12	7	595
+13	7	596
+1	8	654
+2	8	0
+3	8	0
+4	8	616
+5	8	0
+6	8	0
+7	8	652
+8	8	610
+9	8	0
+10	8	0
+11	8	0
+12	8	0
+13	8	649
+1	9	0
+2	9	572
+3	9	549
+4	9	0
+5	9	0
+6	9	501
+7	9	0
+8	9	0
+9	9	0
+10	9	538
+11	9	584
+12	9	0
+13	9	564
+1	10	594
+2	10	0
+3	10	573
+4	10	0
+5	10	575
+6	10	501
+7	10	0
+8	10	0
+9	10	563
+10	10	0
+11	10	569
+12	10	0
+13	10	0
+
+;
+  
+end;

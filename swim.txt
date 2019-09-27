@@ -1,0 +1,171 @@
+// expected times
+ t  c1  c2  c3
+p1  #   #   #
+p2  #   #   #
+p3  #   #   #
+
+
+min:
+    t_p1_c1 * p1_c1  +  t_p2_c1 * p2_c1  +  t_p3_c1 * p3_c1
++   t_p1_c2 * p1_c2  +  t_p2_c2 * p2_c2  +  t_p3_c2 * p3_c2
++   t_p1_c3 * p1_c3  +  t_p2_c3 * p2_c3  +  t_p3_c3 * p3_c3
+
+s.t.:
+
+// every course by exactly one player
+p1_c1 + p2_c1 + p3_c1 = 1
+p1_c2 + p2_c2 + p3_c2 = 1
+p1_c3 + p2_c3 + p3_c3 = 1
+
+// every player no more than two courses
+p1_c1 + p1_c2 + p1_c3 <= 2
+p2_c1 + p2_c2 + p2_c3 <= 2
+p3_c1 + p3_c2 + p3_c3 <= 2
+
+every p#_c# in {0,1}
+
+----
+#var = #p * #c
+
+#p = 20
+#c = 17
+#var = 340
+
+var p1_c1 >= 0;
+var p2_c1 >= 0;
+var p3_c1 >= 0;
+var p1_c2 >= 0;
+var p2_c2 >= 0;
+var p3_c2 >= 0;
+var p1_c3 >= 0;
+var p2_c3 >= 0;
+var p3_c3 >= 0;
+
+var p1_c1 >= 0;
+var p2_c1 >= 0;
+var p3_c1 >= 0;
+var p1_c2 >= 0;
+var p2_c2 >= 0;
+var p3_c2 >= 0;
+var p1_c3 >= 0;
+var p2_c3 >= 0;
+var p3_c3 >= 0;
+
+
+------
+https://online-optimizer.appspot.com/?model=ms:Li67k3lycgPJYMbR3Ab8jMYkSuoEW711
+set Player;
+set Course;
+set Times, dimen 3;
+
+
+# Parameters
+# param time{Player,Course};
+
+
+# minimum number of workdays in row
+param time{p in Player,c in Course} := min{(p, c, t) in Times} t;
+
+# Decision variables
+var x{Player,Course} >= 0, <= 1;
+
+# Objective
+minimize z:
+	sum {p in Player, c in Course} time[p,c] * x[p,c];
+    
+# Constraints
+subject to only_twice{p in Player}:
+	sum {c in Course} x[p,c] <= 2;
+	
+subject to every_course{c in Course}:
+	sum {p in Player} x[p,c] = 1;
+
+
+data;
+
+set Player := 1 2 3;
+set Course := 1 2 3;
+
+set Times := 
+  ( 1, 1, 15 )
+  ( 2, 1, 20 )
+  ( 3, 1, 12 )
+  ( 1, 2, 25 )
+  ( 2, 2, 25 )
+  ( 3, 2, 20 )
+  ( 1, 3, 35 )
+  ( 2, 3, 27 )
+  ( 3, 3, 30 );
+  
+end;
+
+
+
+--------
+
+https://online-optimizer.appspot.com/?model=ms:Li67k3lycgPJYMbR3Ab8jMYkSuoEW711
+
+set Player;
+set Course;
+set Times, dimen 3;
+
+
+# Parameters
+# param time{Player,Course};
+
+
+# minimum number of workdays in row
+param time{p in Player,c in Course} := min{(p, c, t) in Times} t;
+
+# Decision variables
+var x{Player,Course} >= 0, <= 5;
+
+# Objective
+minimize z:
+	sum {p in Player, c in Course} time[p,c] * x[p,c];
+    
+# Constraints
+subject to max_courses{p in Player}:
+	sum {c in Course} x[p,c] <= 5;
+	
+subject to every_course{c in Course}:
+	sum {p in Player} x[p,c] = 2;
+
+
+data;
+
+set Player := 1 2 3 4 5;
+set Course := 1 2 3 4;
+
+set Times := 
+  ( 1, 1, 15 )
+  ( 2, 1, 20 )
+  ( 3, 1, 12 )
+  ( 4, 1, 10 )
+  ( 5, 1, 12 )
+  
+  ( 1, 2, 25 )
+  ( 2, 2, 25 )
+  ( 3, 2, 20 )
+  ( 4, 2, 30 )
+  ( 5, 2, 22 )
+  
+  ( 1, 3, 35 )
+  ( 2, 3, 27 )
+  ( 3, 3, 30 )
+  ( 4, 3, 32 )
+  ( 5, 3, 30 )
+  
+  ( 1, 4, 36 )
+  ( 2, 4, 38 )
+  ( 3, 4, 40 )
+  ( 4, 4, 35 )
+  ( 5, 4, 38 );
+  
+end;
+
+
+
+7-13 sportler
+nicht die gleiche strecke 2x vom selben
+cooldown pro course

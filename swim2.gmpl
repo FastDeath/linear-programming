@@ -10,7 +10,6 @@ param Score{1..NumCourses, 1..NumPlayers};
 param CourseName{Course} symbolic;
 param PlayerName{Player} symbolic;
 param CourseDifficulty{Course};
-# display CourseName, CourseDifficulty;
 
 param MaxCoursesPerPlayer;
 param MaxOverload;
@@ -21,7 +20,6 @@ param BestTime{c in Course} := min{p in Player : Score[c, p] <> 0} Score[c, p];
 var swims{Lap,Course,Player}, binary;
 
 # Objective
-# minimize z:
 maximize z:
 	sum {l in Lap, c in Course, p in Player} Score[c, p] * swims[l, c, p];
     
@@ -43,19 +41,7 @@ subject to forbid_unknowns{l in Lap, c in Course}:
 subject to every_lap_by_another{c in Course, p in Player}:
 	sum {l in Lap} swims[l, c, p] <= 1;
 
-# subject to player_is_chill{l in Lap, c in Course, p in Player}:
-#     sum { ls in Lap, cs in Course :
-#             # only the ones before l/c
-#             (ls < l or (ls = l and cs < c))
-            
-#             # only the ones that still affect (prevent negative rating)
-#             # (CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) + 1 - c - (l-1)*NumCourses)) >= 0
-#             and CourseDifficulty[cs] + ((ls-1)*NumCourses + cs) >= c + (l-1)*NumCourses - 1 
-#         } ((1 - swims[ls, cs, p] - swims[l,c,p]) * CourseDifficulty[cs] + 1 - c - (l-1)*NumCourses) = 0;
-        # remaining difficulty rating shall be less than MaxOverload
-        # <= MaxOverload;
-# min {l in Lap, c in Course : swims[l, c, p] = 1}
-
+# Players cant swim when cooldown from a previously swum course is active
 subject to player_is_chill{l in Lap, c in Course, p in Player}:
     sum { ls in Lap, cs in Course : 
         # after swimming ls/cs, p can't swim for CourseDifficulty[cs] - MaxOverload courses
@@ -121,7 +107,7 @@ printf "\n";
 
 printf '"Strecke"';
 for {p in Player}
-    printf ',"%s"', PlayerName[p];
+    printf ',"%s",c', PlayerName[p];
 printf "\n";
 
 for {l in Lap, c in Course} {
@@ -129,6 +115,11 @@ for {l in Lap, c in Course} {
 
     for {p in Player} {
         printf '%s,', if swims[l,c,p] = 0 then "" else swims[l,c,p] * Score[c,p];
+        printf '%s,', 
+            sum { ls in Lap, cs in Course : 
+                # after swimming ls/cs, p can't swim for CourseDifficulty[cs] - MaxOverload courses
+                (l-1)*NumCourses+c - ((ls-1)*NumCourses+cs) in {1..(CourseDifficulty[cs]-MaxOverload)}
+            } swims[ls,cs,p] * (CourseDifficulty[cs]-MaxOverload-((l-1)*NumCourses+c)+((ls-1)*NumCourses+cs));
     }
 
     printf "\n";
@@ -152,18 +143,6 @@ for {p in Player}
                         (l-1)*NumCourses+c - ((ls-1)*NumCourses+cs) in {1..(CourseDifficulty[cs]-MaxOverload)}
                     } swims[ls,cs,p]
                 > 0 then "*cooldown*" else "";
-
-        # for {ls in Lap, cs in Course}
-        # {
-        #     printf "        L%i/C%i #%i -> swims=%i\n", ls, cs, ((ls-1)*NumCourses+cs) - ((l-1)*NumCourses+c), swims[ls,cs,p];
-        # }
-
-            # sum { ls in Lap, cs in Course : 
-            #     # (ls = l and cs = c-1) or (ls = l-1 and cs = NumCourses)
-
-            #     (l-1)*NumCourses+c - (ls-1)*NumCourses+cs = 1
-            # } (swims[ls,cs,p] * (ls-1)*NumCourses+cs);
-
     }  
 }
 
@@ -206,31 +185,7 @@ param PlayerName :=
 ;
 
 param Score := 
-#   c, p, time
-    # 1, 1, 15
-    # 1, 2, 20
-    # 1, 3, 12
-    # 1, 4, 10
-    # 1, 5, 12
-    
-    # 2, 1, 25
-    # 2, 2, 25
-    # 2, 3, 20
-    # 2, 4, 30
-    # 2, 5, 22
-
-    # 3, 1, 35
-    # 3, 2, 27
-    # 3, 3, 30
-    # 3, 4, 32
-    # 3, 5, 30
-
-    # 4, 1, 36
-    # 4, 2, 38
-    # 4, 3, 40
-    # 4, 4, 35
-    # 4, 5, 38
-#c	p	time
+#c	p	score
 1	1	0
 2	1	0
 3	1	0
